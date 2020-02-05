@@ -1,92 +1,185 @@
-const fs = require('fs');
-const readline = require('readline');
-const {google} = require('googleapis');
+const mapStyle = [{
+  featureType: 'all',
+  elementType: 'all',
+  stylers: [{ visibility: 'off' }]
+}, {
+  featureType: 'water',
+  elementType: 'labels',
+  stylers: [{ visibility: 'off' }]
+}, {
+  featureType: 'road.highway',
+  elementType: 'geometry',
+  stylers: [{ visibility: 'on' }]
+}, {
+  featureType: 'transit.station.airport',
+  elementType: 'all',
+  stylers: [{ visibility: 'on' }]
+}];
+let map;
+let statMax = Number.MAX_VALUE, statMin = Number.MIN_VALUE;
 
-// If modifying these scopes, delete token.json.
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
-// The file token.json stores the user's access and refresh tokens, and is
-// created automatically when the authorization flow completes for the first
-// time.
-const TOKEN_PATH = 'token.json';
+function initMap() {
+  // load the map
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 40, lng: -100},
+    zoom: 4,
+    mapTypeId: 'hybrid',
+    styles: mapStyle
+  });
 
-// Load client secrets from a local file.
-fs.readFile('credentials.json', (err, content) => {
-  if (err) return console.log('Error loading client secret file:', err);
-  // Authorize a client with credentials, then call the Google Sheets API.
-  authorize(JSON.parse(content), listMajors);
-});
+  // set up the style rules and events for google.maps.Data
+  map.data.setStyle(styleFeature);
+  map.data.addListener('mouseover', mouseInToRegion);
+  map.data.addListener('mouseout', mouseOutOfRegion);
 
-/**
- * Create an OAuth2 client with the given credentials, and then execute the
- * given callback function.
- * @param {Object} credentials The authorization client credentials.
- * @param {function} callback The callback to call with the authorized client.
- */
-function authorize(credentials, callback) {
-  const {client_secret, client_id, redirect_uris} = credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(
-      client_id, client_secret, redirect_uris[0]);
+  // wire up the button
+  let selectBox = document.getElementById('stat-variable');
+  google.maps.event.addDomListener(selectBox, 'change', function() {
+    clearStatData();
+    loadStatData(selectBox.options[selectBox.selectedIndex].value);
+  });
 
-  // Check if we have previously stored a token.
-  fs.readFile(TOKEN_PATH, (err, token) => {
-    if (err) return getNewToken(oAuth2Client, callback);
-    oAuth2Client.setCredentials(JSON.parse(token));
-    callback(oAuth2Client);
+  // state polygons only need to be loaded once, do them now
+  loadMapShapes();
+}
+
+/** Loads the state boundary polygons from a GeoJSON source. */
+function loadMapShapes() {
+  // load US state outline polygons from a GeoJson file
+  //map.data.loadGeoJson('https://storage.googleapis.com/mapsdevsite/json/states.js', { idPropertyName: 'STATE' });
+  console.log(map.data);
+  map.data.loadGeoJson('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json');
+  console.log(map.data);
+
+  // wait for the request to complete by listening for the first feature to be
+  // added
+  google.maps.event.addListenerOnce(map.data, 'addfeature', function() {
+    google.maps.event.trigger(document.getElementById('stat-variable'),
+        'change');
   });
 }
 
 /**
- * Get and store new token after prompting for user authorization, and then
- * execute the given callback with the authorized OAuth2 client.
- * @param {google.auth.OAuth2} oAuth2Client The OAuth2 client to get token for.
- * @param {getEventsCallback} callback The callback for the authorized client.
+ * Loads the census data from a simulated API call to the US Census API.
+ *
+ * @param {string} variable
  */
-function getNewToken(oAuth2Client, callback) {
-  const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-  });
-  console.log('Authorize this app by visiting this url:', authUrl);
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  rl.question('Enter the code from that page here: ', (code) => {
-    rl.close();
-    oAuth2Client.getToken(code, (err, token) => {
-      if (err) return console.error('Error while trying to retrieve access token', err);
-      oAuth2Client.setCredentials(token);
-      // Store the token to disk for later program executions
-      fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-        if (err) return console.error(err);
-        console.log('Token stored to', TOKEN_PATH);
-      });
-      callback(oAuth2Client);
+function loadStatData(variable) {
+  // load the requested variable from the census API (using local copies)
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', variable);
+  xhr.onload = function() {
+    var statData = JSON.parse(xhr.responseText);
+    statData.shift(); // the first row contains column names
+    statData.forEach(function(row) {
+      var statVariable = parseFloat(row[0]);
+      var stateId = row[1];
+
+      // keep track of min and max values
+      if (statVariable < statMin) {
+        statMin = statVariable;
+      }
+      if (statVariable > statMax) {
+        statMax = statVariable;
+      }
+
+      // update the existing row with the new data
+      map.data
+        .getFeatureById(stateId)
+        //.setProperty('stat_variable', statVariable);
     });
+
+    // update and display the legend
+    document.getElementById('stat-min').textContent =
+        statMin.toLocaleString();
+    document.getElementById('stat-max').textContent =
+        statMax.toLocaleString();
+  };
+  xhr.send();
+}
+
+/** Removes census data from each shape on the map and resets the UI. */
+function clearStatData() {
+  statMin = Number.MAX_VALUE;
+  statMax = -Number.MAX_VALUE;
+  map.data.forEach(function(row) {
+    row.setProperty('stat_variable', undefined);
   });
+  document.getElementById('data-box').style.display = 'none';
+  document.getElementById('data-caret').style.display = 'none';
 }
 
 /**
- * Prints the names and majors of students in a sample spreadsheet:
- * @see https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
- * @param {google.auth.OAuth2} auth The authenticated Google OAuth client.
+ * Applies a gradient style based on the 'stat_variable' column.
+ * This is the callback passed to data.setStyle() and is called for each row in
+ * the data set.  Check out the docs for Data.StylingFunction.
+ *
+ * @param {google.maps.Data.Feature} feature
  */
-function listMajors(auth) {
-  const sheets = google.sheets({version: 'v4', auth});
-  sheets.spreadsheets.values.get({
-    spreadsheetId: '1wQVypefm946ch4XDp37uZ-wartW4V7ILdg-qYiDXUHM',
-    range: '!A2:E',
-  }, (err, res) => {
-    if (err) return console.log('The API returned an error: ' + err);
-    const rows = res.data.values;
-    if (rows.length) {
-      console.log('Name, Major:');
-      // Print columns A and E, which correspond to indices 0 and 4.
-      rows.map((row) => {
-        console.log(`${row[0]}, ${row[4]}`);
-      });
-    } else {
-      console.log('No data found.');
-    }
-  });
+function styleFeature(feature) {
+  var low = [5, 69, 54];  // color of smallest datum
+  var high = [151, 83, 34];   // color of largest datum
+
+  // delta represents where the value sits between the min and max
+  var delta = (feature.getProperty('stat_variable') - statMin) /
+      (statMax - statMin);
+
+  var color = [];
+  for (var i = 0; i < 3; i++) {
+    // calculate an integer color based on the delta
+    color[i] = (high[i] - low[i]) * delta + low[i];
+  }
+
+  // determine whether to show this shape or not
+  var showRow = true;
+  if (feature.getProperty('stat_variable') == null ||
+      isNaN(feature.getProperty('stat_variable'))) {
+    showRow = false;
+  }
+
+  var outlineWeight = 0.5, zIndex = 1;
+  if (feature.getProperty('state') === 'hover') {
+    outlineWeight = zIndex = 2;
+  }
+
+  return {
+    strokeWeight: outlineWeight,
+    strokeColor: '#fff',
+    zIndex: zIndex,
+    fillColor: 'hsl(' + color[0] + ',' + color[1] + '%,' + color[2] + '%)',
+    fillOpacity: 0.75,
+    visible: showRow
+  };
+}
+
+/**
+ * Responds to the mouse-in event on a map shape (state).
+ *
+ * @param {?google.maps.MouseEvent} e
+ */
+function mouseInToRegion(e) {
+  // set the hover state so the setStyle function can change the border
+  e.feature.setProperty('state', 'hover');
+
+  var percent = (e.feature.getProperty('stat_variable') - statMin) /
+      (statMax - statMin) * 100;
+
+  // update the label
+  document.getElementById('data-label').textContent =
+      e.feature.getProperty('NAME');
+  document.getElementById('data-value').textContent =
+      e.feature.getProperty('stat_variable').toLocaleString();
+  document.getElementById('data-box').style.display = 'block';
+  document.getElementById('data-caret').style.display = 'block';
+  document.getElementById('data-caret').style.paddingLeft = percent + '%';
+}
+
+/**
+ * Responds to the mouse-out event on a map shape (state).
+ *
+ * @param {?google.maps.MouseEvent} e
+ */
+function mouseOutOfRegion(e) {
+  // reset the hover state, returning the border to normal
+  e.feature.setProperty('state', 'normal');
 }
