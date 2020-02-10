@@ -18,6 +18,44 @@ const mapStyle = [{
 let map;
 let statMax = Number.MAX_VALUE, statMin = Number.MIN_VALUE;
 
+const chinaDict = {
+  Anhui: "安徽",
+  Beijing: "北京",
+  Chongqing: "重庆",
+  Fujian: "福建",
+  Gansu: "甘肃",
+  Guangdong: "广东",
+  Guangxi: "广西",
+  Guizhou: "贵州",
+  Hainan: "海南",
+  Hebei: "河北",
+  Heilongjiang: "黑龙江",
+  Henan: "河南",
+  Hubei: "湖北",
+  Hunan: "湖南",
+  "Inner Mongolia": "内蒙古",
+  Jiangsu: "江苏",
+  Jiangxi: "江西",
+  Jilin: "吉林",
+  Liaoning: "辽宁",
+  Macao: "澳门",
+  Ningxia: "宁夏",
+  Qinghai: "青海",
+  Shaanxi: "陕西",
+  Shandong: "山东",
+  Shanxi: "山西",
+  Shanghai: "上海",
+  Sichuan: "四川",
+  Taiwan: "台湾",
+  Tianjin: "天津",
+  Tibet: "西藏",
+  Xianggang: "香港",
+  Xinjiang: "新疆",
+  Xizang: "西藏",
+  Yunnan: "云南",
+  Zhejiang: "浙江"
+}
+
 function initMap() {
   // load the map
   map = new google.maps.Map(document.getElementById('map'), {
@@ -36,7 +74,7 @@ function initMap() {
   let selectBox = document.getElementById('stat-variable');
   google.maps.event.addDomListener(selectBox, 'change', function() {
     clearStatData();
-    loadStatData(selectBox.options[selectBox.selectedIndex].value);
+    setTimeout(() => { loadStatData(selectBox.options[selectBox.selectedIndex].value); }, 500);
   });
 
   // state polygons only need to be loaded once, do them now
@@ -46,10 +84,15 @@ function initMap() {
 /** Loads the state boundary polygons from a GeoJSON source. */
 function loadMapShapes() {
   // load US state outline polygons from a GeoJson file
-  //map.data.loadGeoJson('https://storage.googleapis.com/mapsdevsite/json/states.js', { idPropertyName: 'STATE' });
-  console.log(map.data);
-  map.data.loadGeoJson('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json');
-  console.log(map.data);
+  // US States
+  //map.data.loadGeoJson('https://storage.googleapis.com/mapsdevsite/json/states.js', { idPropertyName: 'NAME' });
+  // Countries
+  map.data.loadGeoJson('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json', { idPropertyName: 'name' });
+  // US Cities
+  map.data.loadGeoJson('https://raw.githubusercontent.com/codynegri/US-City-GeoJSON/master/us_cities.geojson', { idPropertyName: 'city'});
+  // Chinese Provinces
+  map.data.loadGeoJson('https://raw.githubusercontent.com/d3cn/data/master/json/geo/china/china-province.geojson', { idPropertyName: 'NAME'});
+
 
   // wait for the request to complete by listening for the first feature to be
   // added
@@ -70,10 +113,14 @@ function loadStatData(variable) {
   xhr.open('GET', variable);
   xhr.onload = function() {
     var statData = JSON.parse(xhr.responseText);
-    statData.shift(); // the first row contains column names
-    statData.forEach(function(row) {
-      var statVariable = parseFloat(row[0]);
-      var stateId = row[1];
+    //statData.shift(); // the first row contains column names
+    for (const row of statData.values) {
+      let statVariable = parseFloat(row[row.length-1]);
+      let stateName = row[0].split(',')[0];
+      let countryName = row[1];
+
+      if (countryName === "Mainland China") stateName = chinaDict[stateName];
+      else if (countryName === "UK") countryName = "United Kingdom";
 
       // keep track of min and max values
       if (statVariable < statMin) {
@@ -84,10 +131,18 @@ function loadStatData(variable) {
       }
 
       // update the existing row with the new data
+      if (map.data.getFeatureById(stateName) !== undefined) {
+        map.data
+          .getFeatureById(stateName)
+          .setProperty('stat_variable', statVariable);
+      } else if (map.data.getFeatureById(countryName) !== undefined) {
       map.data
-        .getFeatureById(stateId)
-        //.setProperty('stat_variable', statVariable);
-    });
+        .getFeatureById(countryName)
+        .setProperty('stat_variable', statVariable);
+      } else {
+        console.log("could not find " + stateName +" "+ countryName);
+      }
+    };
 
     // update and display the legend
     document.getElementById('stat-min').textContent =
