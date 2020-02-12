@@ -84,7 +84,7 @@ function initMap() {
   let selectBox = document.getElementById('stat-variable');
   google.maps.event.addDomListener(selectBox, 'change', function() {
     clearStatData();
-    loadStatData(selectBox.options[selectBox.selectedIndex].value);
+    setTimeout(() => { loadStatData(selectBox.options[selectBox.selectedIndex].value); }, 500);
   });
 
   // state polygons only need to be loaded once, do them now
@@ -185,8 +185,8 @@ function clearStatData() {
  * @param {google.maps.Data.Feature} feature
  */
 function styleFeature(feature) {
-  var low = [151, 83, 34];    // color of smallest datum
-  var high = [5, 69, 54];     // color of largest datum
+  var low = [5, 80, 60];    // color of smallest datum
+  var high = [4, 85, 16];     // color of largest datum
 
   // delta represents where the value sits between the min and max
   var delta = (Math.log(feature.getProperty('stat_variable')) - Math.log(statMin)) /
@@ -215,7 +215,7 @@ function styleFeature(feature) {
     strokeColor: '#fff',
     zIndex: zIndex,
     fillColor: 'hsl(' + color[0] + ',' + color[1] + '%,' + color[2] + '%)',
-    fillOpacity: 0.75,
+    fillOpacity: (delta / 2) + 0.4,
     visible: showRow
   };
 }
