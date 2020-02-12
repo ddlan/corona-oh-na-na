@@ -54,7 +54,17 @@ const chinaDict = {
   Xizang: "西藏",
   Yunnan: "云南",
   Zhejiang: "浙江"
-}
+};
+
+const naDict = {
+  AZ: "Arizona",
+  CA: "California",
+  IL: "Illinois",
+  MA: "Massachusetts",
+  ON: "Ontario",
+  WI: "Wisconsin",
+  WA: "Washington",
+};
 
 function initMap() {
   // load the map
@@ -74,7 +84,7 @@ function initMap() {
   let selectBox = document.getElementById('stat-variable');
   google.maps.event.addDomListener(selectBox, 'change', function() {
     clearStatData();
-    setTimeout(() => { loadStatData(selectBox.options[selectBox.selectedIndex].value); }, 500);
+    loadStatData(selectBox.options[selectBox.selectedIndex].value);
   });
 
   // state polygons only need to be loaded once, do them now
@@ -88,8 +98,10 @@ function loadMapShapes() {
   //map.data.loadGeoJson('https://storage.googleapis.com/mapsdevsite/json/states.js', { idPropertyName: 'NAME' });
   // Countries
   map.data.loadGeoJson('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json', { idPropertyName: 'name' });
-  // US Cities
-  map.data.loadGeoJson('https://raw.githubusercontent.com/codynegri/US-City-GeoJSON/master/us_cities.geojson', { idPropertyName: 'city'});
+  // Canadian Provinces
+  map.data.loadGeoJson('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/canada.geojson', { idPropertyName: 'name'});
+  // US States
+  map.data.loadGeoJson('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json', { idPropertyName: 'name'});
   // Chinese Provinces
   map.data.loadGeoJson('https://raw.githubusercontent.com/d3cn/data/master/json/geo/china/china-province.geojson', { idPropertyName: 'NAME'});
 
@@ -116,11 +128,12 @@ function loadStatData(variable) {
     //statData.shift(); // the first row contains column names
     for (const row of statData.values) {
       let statVariable = parseFloat(row[row.length-1]);
-      let stateName = row[0].split(',')[0];
+      let stateName = row[0];
       let countryName = row[1];
 
       if (countryName === "Mainland China") stateName = chinaDict[stateName];
       else if (countryName === "UK") countryName = "United Kingdom";
+      else if (stateName.includes(',')) stateName = naDict[stateName.split(",")[1].trim()];
 
       // keep track of min and max values
       if (statVariable < statMin) {
@@ -140,7 +153,7 @@ function loadStatData(variable) {
         .getFeatureById(countryName)
         .setProperty('stat_variable', statVariable);
       } else {
-        console.log("could not find " + stateName +" "+ countryName);
+        console.log("could not find " + stateName + " " + countryName);
       }
     };
 
@@ -172,12 +185,12 @@ function clearStatData() {
  * @param {google.maps.Data.Feature} feature
  */
 function styleFeature(feature) {
-  var low = [5, 69, 54];  // color of smallest datum
-  var high = [151, 83, 34];   // color of largest datum
+  var low = [151, 83, 34];    // color of smallest datum
+  var high = [5, 69, 54];     // color of largest datum
 
   // delta represents where the value sits between the min and max
-  var delta = (feature.getProperty('stat_variable') - statMin) /
-      (statMax - statMin);
+  var delta = (Math.log(feature.getProperty('stat_variable')) - Math.log(statMin)) /
+      (Math.log(statMax) - Math.log(statMin));
 
   var color = [];
   for (var i = 0; i < 3; i++) {
@@ -220,8 +233,15 @@ function mouseInToRegion(e) {
       (statMax - statMin) * 100;
 
   // update the label
-  document.getElementById('data-label').textContent =
-      e.feature.getProperty('NAME');
+
+  if (e.feature.getProperty('NAME') !== undefined) {
+    document.getElementById('data-label').textContent =
+        e.feature.getProperty('NAME');
+  } else {
+    document.getElementById('data-label').textContent =
+        e.feature.getProperty('name');
+  }
+
   document.getElementById('data-value').textContent =
       e.feature.getProperty('stat_variable').toLocaleString();
   document.getElementById('data-box').style.display = 'block';
