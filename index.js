@@ -60,8 +60,18 @@ const naDict = {
   AZ: "Arizona",
   CA: "California",
   IL: "Illinois",
+  FL: "Florida",
+  GA: "Georgia",
   MA: "Massachusetts",
+  NC: "North Carolina",
+  NE: "Nebraska",
+  NH: "New Hampshire",
+  NY: "New York",
   ON: "Ontario",
+  OR: "Oregon",
+  QC: "Quebec",
+  RI: "Rhode Island",
+  TX: "Texas",
   WI: "Wisconsin",
   WA: "Washington",
 };
@@ -124,38 +134,39 @@ function loadStatData(variable) {
   var xhr = new XMLHttpRequest();
   xhr.open('GET', variable);
   xhr.onload = function() {
-    var statData = JSON.parse(xhr.responseText);
+    let statData = CSVToArray(xhr.responseText);
     //statData.shift(); // the first row contains column names
-    for (const row of statData.values) {
-      let statVariable = parseFloat(row[row.length-1]);
+    statData.forEach(function(row, i) {
+      if (i == 0) return;
+      let statVar = parseFloat(row[row.length-1]);
       let stateName = row[0];
       let countryName = row[1];
 
       if (countryName === "Mainland China") stateName = chinaDict[stateName];
       else if (countryName === "UK") countryName = "United Kingdom";
-      else if (stateName.includes(',')) stateName = naDict[stateName.split(",")[1].trim()];
+      else if (stateName.includes(',')) stateName = naDict[stateName.split(",")[1].substring(1,3)];
 
       // keep track of min and max values
-      if (statVariable < statMin) {
-        statMin = statVariable;
+      if (statVar < statMin) {
+        statMin = Math.max(statVar, 1); // if statVar is 0, colors don't show
       }
-      if (statVariable > statMax) {
-        statMax = statVariable;
+      if (statVar > statMax) {
+        statMax = statVar;
       }
 
       // update the existing row with the new data
       if (map.data.getFeatureById(stateName) !== undefined) {
         map.data
           .getFeatureById(stateName)
-          .setProperty('stat_variable', statVariable);
+          .setProperty('stat_variable', statVar);
       } else if (map.data.getFeatureById(countryName) !== undefined) {
       map.data
         .getFeatureById(countryName)
-        .setProperty('stat_variable', statVariable);
+        .setProperty('stat_variable', statVar);
       } else {
         console.log("could not find " + stateName + " " + countryName);
       }
-    };
+    });
 
     // update and display the legend
     document.getElementById('stat-min').textContent =
@@ -188,14 +199,20 @@ function styleFeature(feature) {
   var low = [5, 80, 60];    // color of smallest datum
   var high = [4, 85, 16];     // color of largest datum
 
-  // delta represents where the value sits between the min and max
-  var delta = (Math.log(feature.getProperty('stat_variable')) - Math.log(statMin)) /
-      (Math.log(statMax) - Math.log(statMin));
+  let statVar = feature.getProperty('stat_variable');
 
   var color = [];
-  for (var i = 0; i < 3; i++) {
-    // calculate an integer color based on the delta
-    color[i] = (high[i] - low[i]) * delta + low[i];
+  if (statVar > 0) {
+    // delta represents where the value sits between the min and max
+    var delta = (Math.log(statVar) - Math.log(statMin)) /
+        (Math.log(statMax) - Math.log(statMin));
+
+    for (var i = 0; i < 3; i++) {
+      // calculate an integer color based on the delta
+      color[i] = (high[i] - low[i]) * delta + low[i];
+    }
+  } else {
+    color = [0,0,0];
   }
 
   // determine whether to show this shape or not

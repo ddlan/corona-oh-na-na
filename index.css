@@ -13,13 +13,13 @@ html, body, #map { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 }
 #controls {
 top: 10px;
-left: 110px;
+left: 250px;
 width: 360px;
 height: 45px;
 }
 #data-box {
 top: 10px;
-left: 500px;
+left: 640px;
 height: 45px;
 line-height: 45px;
 display: none;

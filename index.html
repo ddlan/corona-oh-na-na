@@ -11,9 +11,9 @@
     <div id="controls" class="nicebox">
       <div>
       <select id="stat-variable">
-        <option value="https://sheets.googleapis.com/v4/spreadsheets/1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo/values/Confirmed!A2:AN73?key=AIzaSyCPbriz7CpZnuea9zWhtxQPsrL-Mtn4YEw">Confirmed cases</option>
-        <option value="https://sheets.googleapis.com/v4/spreadsheets/1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo/values/Death!A2:AN73?key=AIzaSyCPbriz7CpZnuea9zWhtxQPsrL-Mtn4YEw">Deaths</option>
-        <option value="https://sheets.googleapis.com/v4/spreadsheets/1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo/values/Recovered!A2:AN73?key=AIzaSyCPbriz7CpZnuea9zWhtxQPsrL-Mtn4YEw">Recovered</option>
+        <option value="https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv">Confirmed cases</option>
+        <option value="https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv">Deaths</option>
+        <option value="https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv">Recovered</option>
       </select>
       </div>
       <div id="legend">
@@ -27,6 +27,7 @@
       <span id="data-value"></span>
     </div>
     <div id="map"></div>
+    <script src="csv-to-array.js"></script>
     <script src="index.js"></script>
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCPbriz7CpZnuea9zWhtxQPsrL-Mtn4YEw&callback=initMap">
